@@ -1,6 +1,63 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=42", "wheel", "setuptools_scm[toml]>=6.0"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "simp_sexp"
+dynamic = ["version"]
+description = "A simple S-expression parser"
+authors = [
+    {name = "Developer", email = "developer@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.7"
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/user/simp_sexp"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "tox>=4.0.0",
+]
+
+[tool.setuptools]
+py-modules = ["simp_sexp", "version"]
+
+[tool.wheel]
+universal = true
 
 [tool.pytest]
 testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.setuptools_scm]
+version_file = "version.py"
+write_to = "version.py"
+write_to_template = '__version__ = "{version}"'
+
+[tool.tox]
+legacy_tox_ini = """
+[tox]
+envlist = py38, py39, py310, py311, py312, py313
+isolated_build = True
+
+[testenv]
+deps =
+    pytest>=7.0
+commands =
+    pytest {posargs:tests}
+"""
