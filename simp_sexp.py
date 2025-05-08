@@ -6,12 +6,13 @@ KiCad, and other formats) and Python data structures. It includes functions for:
 - Converting S-expression strings to nested Python lists
 - Converting nested Python lists back to S-expression strings
 - Pretty-formatting S-expression strings with proper indentation
+- Searching for elements or patterns within nested lists
 
 These utilities are useful when working with CAD file formats, configuration files,
 or any other data format that uses S-expressions.
 """
 
-__all__ = ["sexp_to_nested_list", "nested_list_to_sexp", "prettify_sexp"]
+__all__ = ["sexp_to_nested_list", "nested_list_to_sexp", "prettify_sexp", "search_nested_list"]
 
 
 def parse_value(input_str):
@@ -401,3 +402,158 @@ def prettify_sexp(sexp, **prettify_kwargs):
         i += 1
 
     return ''.join(result)
+
+def search_nested_list(nested_list, pattern, search_type='key_path', max_depth=None, current_path=None, current_keypath=None):
+    """
+    Search through a nested list structure and return all matching sublists.
+
+    This function recursively traverses a nested list structure, looking for sublists
+    that match the specified pattern according to the search criteria. It returns
+    a list of all matching sublists along with their paths in the structure.
+
+    Args:
+        nested_list (list): The nested list structure to search within.
+        pattern: The pattern to search for. Can be a value, function, regular expression,
+                or a path string depending on the search_type.
+        search_type (str): The type of search to perform. Options:
+            - 'key_path': (Default) Match a slash-delimited path string, with two formats:
+                * "key1/key2/key3": Relative search - finds any sublist whose path ends with these keys
+                * "/key1/key2/key3": Absolute search - finds only sublists whose complete path matches these keys
+            - 'value': Direct equality comparison with the first element of each sublist
+            - 'first_value': Same as 'value' but for case-insensitive string comparison
+            - 'contains': Check if the pattern is present anywhere in the sublist
+            - 'function': Use a custom function that takes a sublist and returns True/False
+            - 'regex': Use a regular expression to match against the first element
+            - 'path': Match the exact path in the nested structure
+        max_depth (int, optional): Maximum depth to search. If None, search all levels.
+        current_path (list, optional): Internal parameter to track the current path.
+        current_keypath (list, optional): Internal parameter to track the current keypath.
+
+    Returns:
+        list: A list of tuples (path, sublist) for all matches found, where path is a list
+        of indices to reach the sublist from the root.
+
+    Examples:
+        >>> pcb_data = ['kicad_pcb', ['version', 20171130], ['general', ['thickness', 1.6]], 
+        ...             ['footprint', ['pad', 1], ['pad', 2]], ['footprint', ['pad', 3]]]
+        >>> # Relative path search (finds all pads regardless of nesting level)
+        >>> search_nested_list(pcb_data, "pad")
+        [([2, 1], ['pad', 1]), ([2, 2], ['pad', 2]), ([3, 1], ['pad', 3])]
+        >>> # Relative path search with multiple keys
+        >>> search_nested_list(pcb_data, "footprint/pad")
+        [([2, 1], ['pad', 1]), ([2, 2], ['pad', 2]), ([3, 1], ['pad', 3])]
+        >>> # Absolute path search (requires exact path from root)
+        >>> search_nested_list(pcb_data, "/kicad_pcb/footprint/pad")
+        [([2, 1], ['pad', 1]), ([2, 2], ['pad', 2]), ([3, 1], ['pad', 3])]
+    """
+    import re
+
+    results = []
+    if current_path is None:
+        current_path = []
+    if current_keypath is None:
+        current_keypath = []
+    
+    # Check if max_depth is reached
+    if max_depth is not None and len(current_path) >= max_depth:
+        return results
+    
+    # Only process lists
+    if not isinstance(nested_list, list) or not nested_list:
+        return results
+    
+    # Get the key (first element) of the current list if available
+    current_key = str(nested_list[0]) if nested_list else None
+    
+    # Update the current keypath if we have a key
+    if current_key is not None:
+        current_keypath = current_keypath + [current_key]
+    
+    # Special handling for key_path search type
+    if search_type == 'key_path' and isinstance(pattern, str):
+        # Determine if this is an absolute or relative path search
+        is_absolute = pattern.startswith('/')
+        
+        # Split the path string into individual keys
+        search_keys = pattern.strip('/').split('/')
+        if not search_keys:
+            return results
+        
+        if is_absolute:
+            # Absolute path search
+            if len(search_keys) == len(current_keypath):
+                # Check if the entire keypath matches
+                if all(sk == ck for sk, ck in zip(search_keys, current_keypath)):
+                    results.append((current_path, nested_list))
+            
+            # Continue searching if the current keypath is a prefix of the search path
+            should_continue_search = (len(current_keypath) < len(search_keys) and 
+                                     all(sk == ck for sk, ck in zip(search_keys, current_keypath)))
+        else:
+            # Relative path search
+            # Check if the end of the current keypath matches the search keys
+            if len(current_keypath) >= len(search_keys):
+                suffix = current_keypath[-len(search_keys):]
+                if all(sk == ck for sk, ck in zip(search_keys, suffix)):
+                    results.append((current_path, nested_list))
+            
+            # Always continue searching for relative paths
+            should_continue_search = True
+        
+        # Recursively search through nested sublists if appropriate
+        if should_continue_search or not is_absolute:
+            for i, item in enumerate(nested_list):
+                if isinstance(item, list):
+                    new_path = current_path + [i]
+                    sub_results = search_nested_list(
+                        item, pattern, search_type, max_depth, new_path, current_keypath
+                    )
+                    results.extend(sub_results)
+        
+        return results
+    
+    # Check if the current list matches the pattern (for other search types)
+    if nested_list:  # Ensure the list is not empty before checking
+        match = False
+        
+        if search_type == 'value' and len(nested_list) > 0:
+            # Check if first element equals pattern
+            match = nested_list[0] == pattern
+            
+        elif search_type == 'first_value' and len(nested_list) > 0:
+            # Case-insensitive string comparison of first element
+            if isinstance(nested_list[0], str) and isinstance(pattern, str):
+                match = nested_list[0].lower() == pattern.lower()
+            
+        elif search_type == 'contains':
+            # Check if pattern exists anywhere in the list
+            match = pattern in nested_list
+            
+        elif search_type == 'function':
+            # Use a custom function to determine match
+            match = pattern(nested_list)
+            
+        elif search_type == 'regex' and len(nested_list) > 0:
+            # Match regex against the string representation of first element
+            if isinstance(nested_list[0], str):
+                if isinstance(pattern, str):
+                    pattern = re.compile(pattern)
+                match = bool(pattern.search(str(nested_list[0])))
+            
+        elif search_type == 'path':
+            # Check if the current path matches the pattern
+            match = current_path == pattern
+        
+        if match:
+            results.append((current_path.copy(), nested_list))
+    
+    # Recursively search through nested sublists
+    for i, item in enumerate(nested_list):
+        if isinstance(item, list):
+            new_path = current_path + [i]
+            sub_results = search_nested_list(
+                item, pattern, search_type, max_depth, new_path, current_keypath
+            )
+            results.extend(sub_results)
+    
+    return results
