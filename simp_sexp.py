@@ -2,17 +2,17 @@
 Simple S-expression parser and formatter for Python.
 
 This module provides utilities for converting between S-expressions (as used in Lisp,
-KiCad, and other formats) and Python data structures. It includes functions for:
-- Converting S-expression strings to nested Python lists
-- Converting nested Python lists back to S-expression strings
-- Pretty-formatting S-expression strings with proper indentation
-- Searching for elements or patterns within nested lists
+KiCad, and other formats) and Python data structures. It includes:
+- The Sexp class for object-oriented S-expression manipulation
+- Functions for converting between S-expressions and Python lists
+- Pretty-formatting S-expression strings
+- Searching for elements within S-expressions
 
 These utilities are useful when working with CAD file formats, configuration files,
 or any other data format that uses S-expressions.
 """
 
-__all__ = ["sexp_to_nested_list", "nested_list_to_sexp", "prettify_sexp", "search_nested_list"]
+__all__ = ["Sexp", "sexp_to_nested_list", "nested_list_to_sexp", "prettify_sexp", "search_nested_list"]
 
 
 def parse_value(input_str):
@@ -191,7 +191,7 @@ def sexp_to_nested_list(s_expr):
     # Return the first element of the result list to remove the extra level of nesting
     return result[0] if len(result) == 1 else result
 
-def nested_list_to_sexp(nested_list, quote_nums=False, quote_strs=False, **prettify_kwargs):
+def nested_list_to_sexp(nested_list, quote_nums=True, quote_strs=True, **prettify_kwargs):
     """
     Convert nested Python lists to an S-expression string.
     
@@ -557,3 +557,109 @@ def search_nested_list(nested_list, pattern, search_type='key_path', max_depth=N
             results.extend(sub_results)
     
     return results
+
+class Sexp(list):
+    """
+    A class representing an S-expression as a nested list structure.
+    
+    This class extends Python's built-in list with methods for parsing,
+    formatting, and searching S-expressions. It provides a convenient
+    object-oriented interface for working with S-expression data.
+    
+    Examples:
+        >>> expr = Sexp('(define (square x) (* x x))')
+        >>> expr
+        ['define', ['square', 'x'], ['*', 'x', 'x']]
+        >>> print(expr.to_str())
+        (define (square "x") (* "x" "x"))
+        >>> subexpr = expr.search('square')
+        >>> subexpr
+        [([], ['square', 'x'])]
+    """
+    
+    def __init__(self, *args, **kwargs):
+        """
+        Initialize an Sexp object.
+        
+        If the first argument is a string, it's parsed as an S-expression.
+        Otherwise, behaves like the list constructor.
+        
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+        """
+        # If first argument is a string, parse it as an S-expression
+        if args and isinstance(args[0], str):
+            parsed = sexp_to_nested_list(args[0])
+            super().__init__(parsed)
+            return
+            
+        # Otherwise, initialize like a normal list
+        super().__init__(*args, **kwargs)
+    
+    def to_str(self, quote_nums=True, quote_strs=True, **prettify_kwargs):
+        """
+        Convert the Sexp object to an S-expression string.
+        
+        Args:
+            quote_nums (bool): If True, wrap numeric values in double-quotes. Default is True.
+            quote_strs (bool): If True, wrap string values in double-quotes. Default is True.
+            **prettify_kwargs: Keyword arguments for formatting:
+                - break_inc (int): Controls when linebreaks are inserted based on nesting level.
+                  Default is 1 (break at every level). Set to 0 or negative for no linebreaks.
+                - spaces_per_level (int): Number of spaces per indentation level. Default is 2.
+        
+        Returns:
+            str: The formatted S-expression string.
+        """
+        return nested_list_to_sexp(self, quote_nums, quote_strs, **prettify_kwargs)
+    
+    def search(self, pattern, search_type='key_path', max_depth=None):
+        """
+        Search for elements within the Sexp that match the given pattern.
+        
+        Args:
+            pattern: The pattern to search for. Can be a value, function, regular expression,
+                    or a path string depending on the search_type.
+            search_type (str): The type of search to perform. Options:
+                - 'key_path': (Default) Match a slash-delimited path string, with two formats:
+                    * "key1/key2/key3": Relative search - finds sublists whose path ends with these keys
+                    * "/key1/key2/key3": Absolute search - finds sublists with exact matching path
+                - 'value': Direct equality comparison with the first element of each sublist
+                - 'first_value': Same as 'value' but for case-insensitive string comparison
+                - 'contains': Check if the pattern is present anywhere in the sublist
+                - 'function': Use a custom function that takes a sublist and returns True/False
+                - 'regex': Use a regular expression to match against the first element
+                - 'path': Match the exact path in the nested structure
+            max_depth (int, optional): Maximum depth to search. If None, search all levels.
+        
+        Returns:
+            list: A list of tuples (path, sublist) for all matches found. The path is a list
+                 of indices to reach the sublist from the root.
+        
+        Examples:
+            >>> pcb = Sexp('(kicad_pcb (version 20171130) (footprint (pad 1)))')
+            >>> pcb.search('pad')
+            [([2, 0], ['pad', 1])]
+            >>> pcb.search('/kicad_pcb/footprint')
+            [([2], ['footprint', ['pad', 1]])]
+        """
+        return search_nested_list(self, pattern, search_type, max_depth)
+    
+    def __str__(self):
+        """
+        Return the string representation of the Sexp object as an S-expression.
+        
+        Returns:
+            str: The S-expression string.
+        """
+        return self.to_str()
+    
+    def __repr__(self):
+        """
+        Return the Python representation of the Sexp object as a list.
+        
+        Returns:
+            str: The list representation.
+        """
+        return super().__repr__()
