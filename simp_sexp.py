@@ -44,22 +44,16 @@ def parse_value(input_str):
     if not input_str:
         return input_str
         
-    # Try to parse as int
     try:
-        int_value = int(input_str)
-        return int_value
+        # Try to parse as int
+        return int(input_str)
     except ValueError:
-        pass
-    
-    # Try to parse as float
-    try:
-        float_value = float(input_str)
-        return float_value
-    except ValueError:
-        pass
-    
-    # If it can't be parsed as int or float, return as string
-    return input_str
+        try:
+            # Try to parse as float
+            return float(input_str)
+        except ValueError:
+            # If it can't be parsed as int or float, return as string
+            return input_str
 
 def sexp_to_nested_list(s_expr):
     """
@@ -196,7 +190,7 @@ def sexp_to_nested_list(s_expr):
     # Return the first element of the result list to remove the extra level of nesting
     return result[0] if len(result) == 1 else result
 
-def nested_list_to_sexp(nested_list, **prettify_kwargs):
+def nested_list_to_sexp(nested_list, quote_nums=False, quote_strs=False, **prettify_kwargs):
     """
     Convert nested Python lists to an S-expression string.
     
@@ -206,8 +200,14 @@ def nested_list_to_sexp(nested_list, **prettify_kwargs):
     
     Args:
         nested_list (list): A nested list structure representing an S-expression.
+        quote_nums (bool): If True, wrap numeric values (int/float) in double-quotes.
+                           If False, print numbers without quotes. Default is True.
+        quote_strs (bool): If True, wrap string values in double-quotes if they don't
+                           already have quotes. If False, print strings without additional
+                           quotes. Default is True.
         **prettify_kwargs: Keyword arguments passed to the prettify_sexp function:
-            - inline (bool): If True, format without newlines. Default is False.
+            - break_inc (int): Controls when linebreaks are inserted based on nesting level. 
+              Default is 1 (break at every level). Set to 0 or negative for no linebreaks.
             - spaces_per_level (int): Number of spaces per indentation level. Default is 2.
     
     Returns:
@@ -216,12 +216,12 @@ def nested_list_to_sexp(nested_list, **prettify_kwargs):
     Examples:
         >>> nested_list_to_sexp(['define', ['square', 'x'], ['*', 'x', 'x']])
         '(define (square "x") (* "x" "x"))'
-        >>> nested_list_to_sexp([1, 2, 3])
-        '(1 "2" "3")'
-        >>> nested_list_to_sexp(['list', ['nested']], inline=True)
-        '(list (nested))'
-        >>> nested_list_to_sexp(['format', 'text'], spaces_per_level=4)
-        '(format "text")'
+        >>> nested_list_to_sexp([1, 2, 3], quote_nums=False)
+        '(1 2 3)'
+        >>> nested_list_to_sexp(['list', 'a', 'b'], quote_strs=False)
+        '(list a b)'
+        >>> nested_list_to_sexp(['cmd', 42, 'text'], quote_nums=False, quote_strs=True)
+        '(cmd 42 "text")'
     """
     if not isinstance(nested_list, list):
         # If it's not a list, return it as a string
@@ -236,17 +236,31 @@ def nested_list_to_sexp(nested_list, **prettify_kwargs):
     for i, item in enumerate(nested_list):
         if isinstance(item, list):
             # Recursively convert nested lists
-            elements.append(nested_list_to_sexp(item))
+            elements.append(nested_list_to_sexp(item, quote_nums, quote_strs))
         else:
             # For non-list items
             item_str = str(item)
-
-            # If it's not the first element and not already in quotes, add quotes
-            if i > 0 and not (item_str.startswith('"') and item_str.endswith('"')) and \
-               not (item_str.startswith("'") and item_str.endswith("'")):
-                elements.append(f'"{item_str}"')
-            else:
+            
+            # First element is never quoted
+            if i == 0:
                 elements.append(item_str)
+                continue
+            
+            # Check if item is already quoted
+            already_quoted = (item_str.startswith('"') and item_str.endswith('"')) or \
+                             (item_str.startswith("'") and item_str.endswith("'"))
+            
+            # Apply quoting rules based on type and parameters
+            if isinstance(item, (int, float)):
+                if quote_nums and not already_quoted:
+                    elements.append(f'"{item_str}"')
+                else:
+                    elements.append(item_str)
+            else:  # String or other type
+                if quote_strs and not already_quoted:
+                    elements.append(f'"{item_str}"')
+                else:
+                    elements.append(item_str)
 
     # Join all elements with spaces, wrap with parentheses, and make it pretty.
     return prettify_sexp("(" + " ".join(elements) + ")", **prettify_kwargs)
@@ -262,8 +276,13 @@ def prettify_sexp(sexp, **prettify_kwargs):
     Args:
         sexp (str): The S-expression string to format.
         **prettify_kwargs: Keyword arguments to control formatting behavior:
-            - inline (bool): If True, format on a single line without newlines. Default is False.
+            - break_inc (int): Controls when linebreaks are inserted. When positive,
+              a linebreak is added before any opening parenthesis that increases
+              the nesting level to a multiple of this value. When 0 or negative,
+              no linebreaks are added but single spaces are inserted before opening
+              and after closing parentheses. Default is 1 (break at every level).
             - spaces_per_level (int): Number of spaces per indentation level. Default is 2.
+              Only applied when break_inc > 0.
         
     Returns:
         str: The formatted S-expression string with proper indentation and structure.
@@ -271,16 +290,17 @@ def prettify_sexp(sexp, **prettify_kwargs):
     Examples:
         >>> prettify_sexp("(foo (bar baz) qux)")
         '(foo\\n  (bar baz)\\n  qux)'
-        >>> prettify_sexp("(foo (bar baz) qux)", inline=True)
+        >>> prettify_sexp("(foo (bar baz) qux)", break_inc=0)
         '(foo (bar baz) qux)'
+        >>> prettify_sexp("(a (b (c (d))))", break_inc=2)
+        '(a (b\\n    (c (d))))'
         >>> prettify_sexp("(deeply (nested (expression)))", spaces_per_level=4)
         '(deeply\\n    (nested\\n        (expression)))'
         >>> prettify_sexp('(with "quoted \\"strings\\"" (intact))')
         '(with\\n  "quoted \\"strings\\""\\n  (intact))'
     """
-
-    inline = prettify_kwargs.get('inline', False)
-    spaces_per_level = prettify_kwargs.get('spaces_per_level', 2) if not inline else 0
+    break_inc = prettify_kwargs.get('break_inc', 1)
+    spaces_per_level = prettify_kwargs.get('spaces_per_level', 2)
 
     # Remove all newlines from the input
     sexp = sexp.replace('\n', '')
@@ -291,6 +311,8 @@ def prettify_sexp(sexp, **prettify_kwargs):
     in_string = None  # None, "'", or '"'.
     escaped = False  # True if the last character was a backslash.
     i = 0
+    last_char = None  # Keep track of the last character added to the result
+    
     while i < len(sexp):
         char = sexp[i]
 
@@ -316,10 +338,18 @@ def prettify_sexp(sexp, **prettify_kwargs):
 
         # Handle parentheses and normal characters.
         if char == '(':
-            # Add newline and indentation before opening parenthesis.
-            if not inline and i > 0:  # Don't add newline before first character.
+            # For break_inc <= 0, add one space before opening parenthesis if not at start
+            # and last character is not whitespace or opening parenthesis
+            if break_inc <= 0 and result and last_char != ' ' and last_char != '(':
+                result.append(' ')
+            
+            # Add newline and indentation before opening parenthesis if needed
+            if break_inc > 0 and level > 0 and (level % break_inc) == 0:
                 result.append('\n')
-            result.append(' ' * (level * spaces_per_level) + char)
+                result.append(' ' * (level * spaces_per_level))
+            
+            result.append(char)
+            last_char = char
             level += 1
 
             # Skip any whitespace after opening parenthesis.
@@ -331,26 +361,42 @@ def prettify_sexp(sexp, **prettify_kwargs):
         elif char == ')':
             level -= 1
             result.append(char)
+            last_char = char
+            
+            # For break_inc <= 0, add one space after closing parenthesis
+            # if not at end and next character is not a closing parenthesis or whitespace
+            if break_inc <= 0 and i + 1 < len(sexp) and sexp[i + 1] not in [')', ' ', '\t', '\n']:
+                result.append(' ')
+                last_char = ' '
 
         elif char in ["'", '"']:
             in_string = char
             result.append(char)
+            last_char = char
 
         elif char.isspace():
-            # Look for whitespace after current character..
+            # Look for whitespace after current character
             j = i + 1
             while j < len(sexp) and sexp[j].isspace():
                 j += 1
 
-            # Remove all whitespace if next non-whitespace char is closing parenthesis.
-            if j < len(sexp) and sexp[j] == ')':
-                i = j - 1  # -1 because i will be incremented at end of loop
+            # When break_inc <= 0, only add one space between tokens
+            if break_inc <= 0:
+                if j < len(sexp) and sexp[j] != ')' and last_char != ' ' and last_char != '(':
+                    result.append(' ')
+                    last_char = ' '
             else:
-                result.append(char)
+                # Regular handling for break_inc > 0
+                if j < len(sexp) and sexp[j] == ')':
+                    i = j - 1
+                else:
+                    result.append(char)
+                    last_char = char
 
         else:
             # Nothing special about this character, so just add it to the result.
             result.append(char)
+            last_char = char
 
         i += 1
 

@@ -13,8 +13,8 @@ def test_sexp_to_nested_list_quotes():
 
 
 def test_nested_list_to_sexp():
-    assert nested_list_to_sexp(["+", 1, 2]) == '(+ "1" "2")'
-    assert nested_list_to_sexp(["define", ["square", "x"], ["*", "x", "x"]], inline=True) == '(define (square "x") (* "x" "x"))'
+    assert nested_list_to_sexp(["+", 1, 2]) == '(+ 1 2)'
+    assert nested_list_to_sexp(["define", ["square", "x"], ["*", "x", "x"]], break_inc=0, quote_strs=True) == '(define (square "x") (* "x" "x"))'
 
 
 def test_nested_expressions():
