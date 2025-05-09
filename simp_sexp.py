@@ -203,7 +203,7 @@ class Sexp(list):
         >>> expr = Sexp('(define (square x) (* x x))')
         >>> expr
         ['define', ['square', 'x'], ['*', 'x', 'x']]
-        >>> print(expr.to_str())
+        >>> print(expr.to_str(break_inc=0))
         (define (square "x") (* "x" "x"))
         >>> subexpr = expr.search('square')
         >>> subexpr
