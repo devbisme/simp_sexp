@@ -70,7 +70,7 @@ def prettify_sexp(sexp, **prettify_kwargs):
               the nesting level to a multiple of this value. When 0 or negative,
               no linebreaks are added but single spaces are inserted before opening
               and after closing parentheses. Default is 1 (break at every level).
-            - spaces_per_level (int): Number of spaces per indentation level. Default is 2.
+            - indent (int): Number of spaces per indentation level. Default is 2.
               Only applied when break_inc > 0.
         
     Returns:
@@ -83,13 +83,13 @@ def prettify_sexp(sexp, **prettify_kwargs):
         '(foo (bar baz) qux)'
         >>> prettify_sexp("(a (b (c (d))))", break_inc=2)
         '(a (b\\n    (c (d))))'
-        >>> prettify_sexp("(deeply (nested (expression)))", spaces_per_level=4)
+        >>> prettify_sexp("(deeply (nested (expression)))", indent=4)
         '(deeply\\n    (nested\\n        (expression)))'
         >>> prettify_sexp('(with "quoted \\"strings\\"" (intact))')
         '(with\\n  "quoted \\"strings\\""\\n  (intact))'
     """
     break_inc = prettify_kwargs.get('break_inc', 1)
-    spaces_per_level = prettify_kwargs.get('spaces_per_level', 2)
+    indent = prettify_kwargs.get('indent', 2)  # Changed from spaces_per_level to indent
 
     # Remove all newlines from the input
     sexp = sexp.replace('\n', '')
@@ -135,7 +135,7 @@ def prettify_sexp(sexp, **prettify_kwargs):
             # Add newline and indentation before opening parenthesis if needed
             if break_inc > 0 and level > 0 and (level % break_inc) == 0:
                 result.append('\n')
-                result.append(' ' * (level * spaces_per_level))
+                result.append(' ' * (level * indent))  # Using indent instead of spaces_per_level
             
             result.append(char)
             last_char = char
@@ -347,7 +347,7 @@ class Sexp(list):
             **prettify_kwargs: Keyword arguments for formatting:
                 - break_inc (int): Controls when linebreaks are inserted based on nesting level.
                   Default is 1 (break at every level). Set to 0 or negative for no linebreaks.
-                - spaces_per_level (int): Number of spaces per indentation level. Default is 2.
+                - indent (int): Number of spaces per indentation level. Default is 2.
         
         Returns:
             str: The formatted S-expression string.
@@ -398,24 +398,27 @@ class Sexp(list):
         # Join all elements with spaces, wrap with parentheses, and make it pretty.
         return prettify_sexp("(" + " ".join(elements) + ")", **prettify_kwargs)
     
-    def search(self, pattern, search_type='key_path', max_depth=None):
+    def search(self, pattern, max_depth=None, contains=False, ignore_case=False):
         """
         Search for elements within the Sexp that match the given pattern.
         
+        The search behavior is automatically determined by the pattern type:
+        - string: Performs key_path search (either relative or absolute path)
+        - function: Calls the function on each sublist to determine matches
+        - re.Pattern: Matches regex pattern against the first element
+        - list/tuple: Interprets as exact path indices to match
+        
         Args:
-            pattern: The pattern to search for. Can be a value, function, regular expression,
-                    or a path string depending on the search_type.
-            search_type (str): The type of search to perform. Options:
-                - 'key_path': (Default) Match a slash-delimited path string, with two formats:
-                    * "key1/key2/key3": Relative search - finds sublists whose path ends with these keys
-                    * "/key1/key2/key3": Absolute search - finds sublists with exact matching path
-                - 'value': Direct equality comparison with the first element of each sublist
-                - 'first_value': Same as 'value' but for case-insensitive string comparison
-                - 'contains': Check if the pattern is present anywhere in the sublist
-                - 'function': Use a custom function that takes a sublist and returns True/False
-                - 'regex': Use a regular expression to match against the first element
-                - 'path': Match the exact path in the nested structure
+            pattern: The pattern to search for:
+                - str: A slash-delimited path (e.g., "key1/key2" or "/root/key1")
+                - function: A function that takes a sublist and returns True/False
+                - re.Pattern: A compiled regular expression to match against first element
+                - list/tuple: A sequence of indices representing an exact path
             max_depth (int, optional): Maximum depth to search. If None, search all levels.
+            contains (bool): If True, searches for pattern in the entire sublist, 
+                           not just the first element. Default is False.
+            ignore_case (bool): If True, performs case-insensitive string comparisons.
+                              Default is False.
         
         Returns:
             list: A list of tuples (path, sublist) for all matches found. The path is a list
@@ -427,7 +430,7 @@ class Sexp(list):
         current_path = []
         current_keypath = []
         
-        def _search_recursive(nested_list, pattern, search_type, max_depth, current_path, current_keypath):
+        def _search_recursive(nested_list, pattern, max_depth, current_path, current_keypath):
             # Check if max_depth is reached
             if max_depth is not None and len(current_path) >= max_depth:
                 return
@@ -443,8 +446,35 @@ class Sexp(list):
             if current_key is not None:
                 current_keypath = current_keypath + [current_key]
             
-            # Special handling for key_path search type
-            if search_type == 'key_path' and isinstance(pattern, str):
+            # Special handling for string pattern (key_path search)
+            if isinstance(pattern, str):
+                # Check if we're doing a contains search with a string pattern
+                if contains:
+                    # For a contains search with a string, we check if the pattern exists anywhere in the list
+                    for i, item in enumerate(nested_list):
+                        if isinstance(item, str):
+                            if ignore_case:
+                                if item.lower() == pattern.lower():
+                                    results.append((current_path.copy(), nested_list))
+                                    break
+                            else:
+                                if item == pattern:
+                                    results.append((current_path.copy(), nested_list))
+                                    break
+                        elif isinstance(item, (int, float)) and str(item) == pattern:
+                            # Also match numeric values as strings
+                            results.append((current_path.copy(), nested_list))
+                            break
+                    
+                    # Continue recursion regardless of match
+                    for i, item in enumerate(nested_list):
+                        if isinstance(item, list):
+                            new_path = current_path + [i]
+                            _search_recursive(item, pattern, max_depth, new_path, current_keypath)
+                    
+                    return
+                
+                # If not a contains search, proceed with key_path search
                 # Determine if this is an absolute or relative path search
                 is_absolute = pattern.startswith('/')
                 
@@ -457,18 +487,27 @@ class Sexp(list):
                     # Absolute path search
                     if len(search_keys) == len(current_keypath):
                         # Check if the entire keypath matches
-                        if all(sk == ck for sk, ck in zip(search_keys, current_keypath)):
+                        if all(
+                            (sk.lower() == ck.lower() if ignore_case else sk == ck)
+                            for sk, ck in zip(search_keys, current_keypath)
+                        ):
                             results.append((current_path.copy(), nested_list))
                     
                     # Continue searching if the current keypath is a prefix of the search path
                     should_continue_search = (len(current_keypath) < len(search_keys) and 
-                                            all(sk == ck for sk, ck in zip(search_keys, current_keypath)))
+                                            all(
+                                                (sk.lower() == ck.lower() if ignore_case else sk == ck)
+                                                for sk, ck in zip(search_keys, current_keypath)
+                                            ))
                 else:
                     # Relative path search
                     # Check if the end of the current keypath matches the search keys
                     if len(current_keypath) >= len(search_keys):
                         suffix = current_keypath[-len(search_keys):]
-                        if all(sk == ck for sk, ck in zip(search_keys, suffix)):
+                        if all(
+                            (sk.lower() == ck.lower() if ignore_case else sk == ck)
+                            for sk, ck in zip(search_keys, suffix)
+                        ):
                             results.append((current_path.copy(), nested_list))
                     
                     # Always continue searching for relative paths
@@ -479,42 +518,39 @@ class Sexp(list):
                     for i, item in enumerate(nested_list):
                         if isinstance(item, list):
                             new_path = current_path + [i]
-                            _search_recursive(item, pattern, search_type, max_depth, 
+                            _search_recursive(item, pattern, max_depth, 
                                              new_path, current_keypath)
                 
                 return
             
-            # Check if the current list matches the pattern (for other search types)
+            # Check if the current list matches the pattern
             if nested_list:  # Ensure the list is not empty before checking
                 match = False
                 
-                if search_type == 'value' and len(nested_list) > 0:
-                    # Check if first element equals pattern
-                    match = nested_list[0] == pattern
-                    
-                elif search_type == 'first_value' and len(nested_list) > 0:
-                    # Case-insensitive string comparison of first element
-                    if isinstance(nested_list[0], str) and isinstance(pattern, str):
-                        match = nested_list[0].lower() == pattern.lower()
-                    
-                elif search_type == 'contains':
-                    # Check if pattern exists anywhere in the list
-                    match = pattern in nested_list
-                    
-                elif search_type == 'function':
-                    # Use a custom function to determine match
+                # Function pattern - call the function with the sublist
+                if callable(pattern):
                     match = pattern(nested_list)
-                    
-                elif search_type == 'regex' and len(nested_list) > 0:
-                    # Match regex against the string representation of first element
-                    if isinstance(nested_list[0], str):
-                        if isinstance(pattern, str):
-                            pattern = re.compile(pattern)
+                
+                # Regular expression pattern
+                elif hasattr(pattern, 'search') and hasattr(pattern, 'pattern'):  # Looks like a regex pattern
+                    if len(nested_list) > 0 and isinstance(nested_list[0], str):
                         match = bool(pattern.search(str(nested_list[0])))
-                    
-                elif search_type == 'path':
-                    # Check if the current path matches the pattern
-                    match = current_path == pattern
+                
+                # Path pattern (list or tuple of indices)
+                elif isinstance(pattern, (list, tuple)):
+                    match = current_path == list(pattern)
+                
+                # Contains search for non-string patterns
+                elif contains:
+                    if ignore_case and isinstance(pattern, str):
+                        # For strings with ignore_case, we need to do case-insensitive comparison
+                        match = any(
+                            (isinstance(item, str) and item.lower() == pattern.lower())
+                            for item in nested_list
+                        )
+                    else:
+                        # For other types or case-sensitive comparison
+                        match = pattern in nested_list
                 
                 if match:
                     results.append((current_path.copy(), nested_list))
@@ -523,11 +559,11 @@ class Sexp(list):
             for i, item in enumerate(nested_list):
                 if isinstance(item, list):
                     new_path = current_path + [i]
-                    _search_recursive(item, pattern, search_type, max_depth, 
+                    _search_recursive(item, pattern, max_depth, 
                                     new_path, current_keypath)
         
         # Start the recursive search
-        _search_recursive(self, pattern, search_type, max_depth, current_path, current_keypath)
+        _search_recursive(self, pattern, max_depth, current_path, current_keypath)
         
         return results
     

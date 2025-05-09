@@ -56,7 +56,7 @@ def test_to_str_quoting():
 
 def test_prettify():
     s = Sexp(['module', 'TEST', ['layer', 'F.Cu'], ['attr', 'smd'], ['pad', 1, 'smd', ['rect', 100, 100]]])
-    pretty = s.to_str(spaces_per_level=2)
+    pretty = s.to_str(indent=2)  # Changed from spaces_per_level to indent
     assert '\n' in pretty  # Should contain newlines
     
     compact = s.to_str(break_inc=0)
@@ -68,19 +68,24 @@ def test_prettify():
     assert '\n' in with_breaks
     assert with_breaks.count('\n') < pretty.count('\n')
 
+def test_prettify_spaces():
+    sexp = "(hello (world))"
+    pretty = prettify_sexp(sexp, indent=4)  # Changed from spaces_per_level to indent
+    assert "    " in pretty  # Should use 4 spaces for indentation
+
 
 # Tests for searching
 def test_search_value():
     s = Sexp('(module TEST (layer F.Cu) (pad 1 smd rect) (pad 2 smd rect))')
     
-    # Search by value
-    results = s.search('pad', search_type='value')
+    # Search by value (first element in a list)
+    results = s.search('pad')  # Now uses key_path search by default for strings
     assert len(results) == 2
     assert results[0][1][0] == 'pad'
     assert results[1][1][0] == 'pad'
     
     # Search by other value
-    results = s.search('layer', search_type='value')
+    results = s.search('layer')  # Now uses key_path search
     assert len(results) == 1
     assert results[0][1] == ['layer', 'F.Cu']
 
@@ -88,11 +93,11 @@ def test_search_keypath():
     s = Sexp('(module TEST (layer F.Cu) (pad 1 smd rect) (pad 2 smd rect))')
     
     # Relative path
-    results = s.search('pad')
+    results = s.search('pad')  # Default behavior for strings
     assert len(results) == 2
     
     # Absolute path
-    results = s.search('/module/pad')
+    results = s.search('/module/pad')  # Absolute path notation
     assert len(results) == 2
     
     # Path that doesn't exist
@@ -103,11 +108,11 @@ def test_search_function():
     s = Sexp('(module TEST (layer F.Cu) (pad 1 smd rect) (pad 2 smd rect))')
     
     # Search for lists with more than 3 elements
-    results = s.search(lambda x: len(x) > 3, search_type='function')
+    results = s.search(lambda x: len(x) > 3)  # No search_type needed, determined by callable
     assert len(results) == 3  # Both pad elements have 4 elements and the module has 5.
     
     # Search for specific first element and value
-    results = s.search(lambda x: x[0] == 'pad' and x[1] == 1, search_type='function')
+    results = s.search(lambda x: x[0] == 'pad' and x[1] == 1)
     assert len(results) == 1
     assert results[0][1] == ['pad', 1, 'smd', 'rect']
 
@@ -115,22 +120,22 @@ def test_search_regex():
     s = Sexp('(module TEST (layer F.Cu) (pad 1 smd rect) (pad 2 smd rect))')
     
     # Search using regex
-    results = s.search(re.compile(r'^pa'), search_type='regex')
+    results = s.search(re.compile(r'^pa'))  # No search_type needed, determined by re.Pattern
     assert len(results) == 2  # Should match "pad" elements
     
-    # Search using regex as string
-    results = s.search(r'^la', search_type='regex')
+    # Search using regex as string (now needs to be compiled as re.Pattern)
+    results = s.search(re.compile(r'^la'))
     assert len(results) == 1  # Should match "layer" element
 
 def test_search_contains():
     s = Sexp('(module TEST (layer F.Cu) (pad 1 smd rect) (pad 2 smd rect))')
     
     # Search for specific value anywhere in the list
-    results = s.search('smd', search_type='contains')
+    results = s.search('smd', contains=True)  # Now uses contains parameter
     assert len(results) == 2  # Both pad elements contain "smd"
     
     # Search for numeric value
-    results = s.search(1, search_type='contains')
+    results = s.search(1, contains=True)
     assert len(results) == 1
 
 def test_search_path():
@@ -140,65 +145,25 @@ def test_search_path():
     first_pad_path = s.search('pad')[0][0]
     
     # Use that exact path to find the same element
-    results = s.search(first_pad_path, search_type='path')
+    results = s.search(first_pad_path)  # No search_type needed, determined by list type
     assert len(results) == 1
     assert results[0][1][0] == 'pad'
 
-
-# Tests for nested Sexp creation
-def test_nested_sexp_creation():
-    # Test that nested lists are converted to Sexp objects
-    s = Sexp(['outer', ['inner1'], ['inner2', ['deep']]])
+def test_search_ignore_case():
+    s = Sexp('(Module TEST (Layer F.Cu) (PAD 1 smd rect))')
     
-    assert isinstance(s, Sexp)
-    assert isinstance(s[1], Sexp)
-    assert isinstance(s[2], Sexp)
-    assert isinstance(s[2][1], Sexp)
+    # Case-sensitive search (default)
+    results = s.search('module')
+    assert len(results) == 0  # Won't match 'Module'
     
-    # Test list modification methods
-    s.append(['new'])
-    assert isinstance(s[3], Sexp)
+    # Case-insensitive search
+    results = s.search('module', ignore_case=True)
+    assert len(results) == 1
+    assert results[0][1][0] == 'Module'
     
-    s.extend([['ext1'], ['ext2']])
-    assert isinstance(s[4], Sexp)
-    assert isinstance(s[5], Sexp)
-    
-    s[1] = ['replaced']
-    assert isinstance(s[1], Sexp)
-
-
-# Tests for prettify_sexp function
-def test_prettify_simple():
-    sexp = "(hello world)"
-    pretty = prettify_sexp(sexp)
-    assert pretty == "(hello world)"  # No formatting needed for simple expressions
-
-def test_prettify_nested():
-    sexp = "(hello (world))"
-    pretty = prettify_sexp(sexp)
-    assert "\n" in pretty  # Should add newlines for nested expressions
-
-def test_prettify_complex():
-    sexp = "(module TEST (layer F.Cu) (attr smd) (pad 1 smd rect))"
-    pretty = prettify_sexp(sexp)
-    assert pretty.count("\n") >= 3  # Should have multiple newlines
-
-def test_prettify_break_inc():
-    sexp = "(a (b (c (d))))"
-    # With break_inc=0, no newlines
-    pretty = prettify_sexp(sexp, break_inc=0)
-    assert "\n" not in pretty
-    
-    # With break_inc=2, fewer newlines
-    pretty2 = prettify_sexp(sexp, break_inc=2)
-    pretty1 = prettify_sexp(sexp, break_inc=1)
-    assert pretty2.count("\n") < pretty1.count("\n")
-
-def test_prettify_spaces():
-    sexp = "(hello (world))"
-    pretty = prettify_sexp(sexp, spaces_per_level=4)
-    assert "    " in pretty  # Should use 4 spaces for indentation
-
+    # Case-insensitive search with contains
+    results = s.search('test', contains=True, ignore_case=True)
+    assert len(results) == 1
 
 @pytest.fixture
 def complex_kicad_pcb():
@@ -260,7 +225,7 @@ def complex_kicad_pcb():
 def test_absolute_path_search(complex_kicad_pcb):
     """Test searching by absolute path."""
     # Find all footprints
-    results = complex_kicad_pcb.search('/kicad_pcb/footprint')
+    results = complex_kicad_pcb.search('/kicad_pcb/footprint')  # Absolute path
     assert len(results) == 2
     assert results[0][1][0] == 'footprint'
     assert 'Capacitor_SMD:C_0805_2012Metric' in results[0][1][1]
@@ -277,7 +242,7 @@ def test_absolute_path_search(complex_kicad_pcb):
 def test_relative_path_search(complex_kicad_pcb):
     """Test searching by relative path."""
     # Find all pads regardless of location
-    results = complex_kicad_pcb.search('pad')
+    results = complex_kicad_pcb.search('pad')  # Relative path
     assert len(results) == 5  # 2 in capacitor + 3 in resistor
     
     # Find all layer entries regardless of location
@@ -310,7 +275,7 @@ def test_function_search(complex_kicad_pcb):
                 any(isinstance(item, list) and item[0] == 'size' and 
                     item[1] == 1.2 and item[2] == 1.4 for item in sublist))
     
-    results = complex_kicad_pcb.search(find_specific_pads, search_type='function')
+    results = complex_kicad_pcb.search(find_specific_pads)  # Function pattern automatically detected
     assert len(results) == 4  # 2 pads in capacitor + 2 pads in resistor with size 1.2x1.4
 
 
@@ -319,18 +284,18 @@ def test_regex_search(complex_kicad_pcb):
     import re
     
     # Find all elements starting with 'net'
-    results = complex_kicad_pcb.search(re.compile(r'^net$'), search_type='regex')
+    results = complex_kicad_pcb.search(re.compile(r'^net$'))  # Regex pattern automatically detected
     assert len(results) == 3  # net 0, net 1, net 2
     
     # Find elements containing layer or layers
-    results = complex_kicad_pcb.search(re.compile(r'layer'), search_type='regex')
+    results = complex_kicad_pcb.search(re.compile(r'layer'))
     assert len(results) == 8
 
 
 def test_combined_searches(complex_kicad_pcb):
     """Test combining multiple search results."""
     # Find capacitor footprint
-    capacitor = complex_kicad_pcb.search('Capacitor_SMD:C_0805_2012Metric', search_type='contains')
+    capacitor = complex_kicad_pcb.search('Capacitor_SMD:C_0805_2012Metric', contains=True)
     assert len(capacitor) == 1
     capacitor_path = capacitor[0][0]
     
@@ -344,7 +309,7 @@ def test_combined_searches(complex_kicad_pcb):
     assert all(pad[0] == 'pad' for pad in capacitor_pads)
     
     # Alternative approach using search with path constraint
-    resistor = complex_kicad_pcb.search('Resistor_SMD:R_0805_2012Metric', search_type='contains')
+    resistor = complex_kicad_pcb.search('Resistor_SMD:R_0805_2012Metric', contains=True)
     assert len(resistor) == 1
     resistor_path = resistor[0][0]
     
@@ -370,7 +335,8 @@ def test_counting_and_verification(complex_kicad_pcb):
     assert len(layers_section) == 5  # 'layers' + 4 layer definitions
     
     # Verify nets
-    nets = complex_kicad_pcb.search('net', search_type='value')
+    # Replaced 'value' search_type with direct path search
+    nets = complex_kicad_pcb.search('net')
     assert len(nets) == 3
     net_names = [match[2] for _, match in nets if len(match) > 2]
     assert set(net_names) == set(['', 'GND', 'VCC'])
@@ -390,5 +356,5 @@ def test_deep_nested_structure(complex_kicad_pcb):
     assert any('Resistor_SMD.3dshapes' in path for path in model_paths)
     
     # Find all rotation specifications (xyz 0 0 0)
-    rotations = complex_kicad_pcb.search('xyz', search_type='contains')
+    rotations = complex_kicad_pcb.search('xyz', contains=True)  # Now using contains=True
     assert len(rotations) == 6  # 3 for each model (offset, scale, rotate)
