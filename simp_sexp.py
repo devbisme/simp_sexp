@@ -207,7 +207,7 @@ class Sexp(list):
         (define (square "x") (* "x" "x"))
         >>> subexpr = expr.search('square')
         >>> subexpr
-        [([], ['square', 'x'])]
+        [([1], ['square', 'x'])]
     """
     
     def __init__(self, *args, **kwargs):
