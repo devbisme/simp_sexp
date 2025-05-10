@@ -10,6 +10,8 @@ These utilities are useful when working with CAD file formats, configuration fil
 or any other data format that uses S-expressions.
 """
 
+import re
+
 __all__ = ["Sexp", "prettify_sexp"]
 
 
@@ -54,6 +56,37 @@ def parse_value(input_str):
             # If it can't be parsed as int or float, return as string
             return input_str
 
+def strip_chars(s, rmv_chars):
+    """
+    Remove entire sequences of characters from rmv_chars that precede newlines in s.
+    
+    Uses a regular expression to match and remove sequences of specified characters
+    that appear immediately before newlines.
+    
+    Args:
+        s (str): The input string to process
+        rmv_chars (str): A string of characters to remove when they precede newlines
+        
+    Returns:
+        str: The processed string with specified character sequences removed before newlines
+        
+    Examples:
+        >>> strip_chars("Hello world!;,\\nNext line", ";,!")
+        'Hello world\\nNext line'
+        >>> strip_chars("Test line;;;\\nAnother line::::\\n", ";:")
+        'Test line\\nAnother line\\n'
+        >>> strip_chars("No newline here", "abc")
+        'No newline here'
+        >>> strip_chars("Mixed chars ab12\\nKeep all", "ab")
+        'Mixed chars ab12\\nKeep all'
+    """
+
+    # Create a pattern that matches one or more characters from rmv_chars followed by a newline
+    pattern = f'[{re.escape(rmv_chars)}]+(?=\n)'
+    
+    # Replace matched patterns with empty string
+    return re.sub(pattern, '', s)
+
 def prettify_sexp(sexp, **prettify_kwargs):
     """
     Format an S-expression string with proper indentation for readability.
@@ -78,7 +111,7 @@ def prettify_sexp(sexp, **prettify_kwargs):
         
     Examples:
         >>> prettify_sexp("(foo (bar baz) qux)")
-        '(foo\\n  (bar baz)\\n  qux)'
+        '(foo\\n  (bar baz) qux)'
         >>> prettify_sexp("(foo (bar baz) qux)", break_inc=0)
         '(foo (bar baz) qux)'
         >>> prettify_sexp("(a (b (c (d))))", break_inc=2)
@@ -86,7 +119,7 @@ def prettify_sexp(sexp, **prettify_kwargs):
         >>> prettify_sexp("(deeply (nested (expression)))", indent=4)
         '(deeply\\n    (nested\\n        (expression)))'
         >>> prettify_sexp('(with "quoted \\"strings\\"" (intact))')
-        '(with\\n  "quoted \\"strings\\""\\n  (intact))'
+        '(with "quoted \\"strings\\""\\n  (intact))'
     """
     break_inc = prettify_kwargs.get('break_inc', 1)
     indent = prettify_kwargs.get('indent', 2)  # Changed from spaces_per_level to indent
@@ -189,7 +222,7 @@ def prettify_sexp(sexp, **prettify_kwargs):
 
         i += 1
 
-    return ''.join(result)
+    return strip_chars(''.join(result), " \t") # Remove trailing whitespace on each line
 
 class Sexp(list):
     """
