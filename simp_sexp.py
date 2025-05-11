@@ -424,6 +424,7 @@ class Sexp(list):
                         elements.append(item_str)
                 else:  # String or other type
                     if quote_strs and not already_quoted:
+                        item_str = item_str.replace('"', '\\"')  # Escape double quotes
                         elements.append(f'"{item_str}"')
                     else:
                         elements.append(item_str)
