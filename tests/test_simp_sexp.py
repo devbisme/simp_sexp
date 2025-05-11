@@ -54,6 +54,11 @@ def test_to_str_quoting():
     assert s.to_str(quote_strs=True, break_inc=0) == '(items "a" "b")'
     assert s.to_str(quote_strs=False, break_inc=0) == '(items a b)'
 
+    # Test embedded string quoting
+    s = Sexp(['text', 'Quote: " and another: "'])
+    assert s.to_str(quote_strs=True, break_inc=0) == '(text "Quote: \\" and another: \\"")'
+    assert s.to_str(quote_strs=False, break_inc=0) == '(text Quote: " and another: ")'
+
 def test_prettify():
     s = Sexp(['module', 'TEST', ['layer', 'F.Cu'], ['attr', 'smd'], ['pad', 1, 'smd', ['rect', 100, 100]]])
     pretty = s.to_str(indent=2)  # Changed from spaces_per_level to indent
