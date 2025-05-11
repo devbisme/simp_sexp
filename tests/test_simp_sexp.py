@@ -86,13 +86,13 @@ def test_search_value():
     # Search by value (first element in a list)
     results = s.search('pad')  # Now uses key_path search by default for strings
     assert len(results) == 2
-    assert results[0][1][0] == 'pad'
-    assert results[1][1][0] == 'pad'
+    assert results[0][0] == 'pad'
+    assert results[1][0] == 'pad'
     
     # Search by other value
     results = s.search('layer')  # Now uses key_path search
     assert len(results) == 1
-    assert results[0][1] == ['layer', 'F.Cu']
+    assert results[0] == ['layer', 'F.Cu']
 
 def test_search_keypath():
     s = Sexp('(module TEST (layer F.Cu) (pad 1 smd rect) (pad 2 smd rect))')
@@ -119,7 +119,7 @@ def test_search_function():
     # Search for specific first element and value
     results = s.search(lambda x: x[0] == 'pad' and x[1] == 1)
     assert len(results) == 1
-    assert results[0][1] == ['pad', 1, 'smd', 'rect']
+    assert results[0] == ['pad', 1, 'smd', 'rect']
 
 def test_search_regex():
     s = Sexp('(module TEST (layer F.Cu) (pad 1 smd rect) (pad 2 smd rect))')
@@ -147,10 +147,10 @@ def test_search_path():
     s = Sexp('(module TEST (layer F.Cu) (pad 1 smd rect) (pad 2 smd rect))')
     
     # Get the exact path indices from first search
-    first_pad_path = s.search('pad')[0][0]
+    first_pad_path = s.search('pad', include_path=True)[0][0]
     
     # Use that exact path to find the same element
-    results = s.search(first_pad_path)  # No search_type needed, determined by list type
+    results = s.search(first_pad_path, include_path=True)  # No search_type needed, determined by list type
     assert len(results) == 1
     assert results[0][1][0] == 'pad'
 
@@ -164,7 +164,7 @@ def test_search_ignore_case():
     # Case-insensitive search
     results = s.search('module', ignore_case=True)
     assert len(results) == 1
-    assert results[0][1][0] == 'Module'
+    assert results[0][0] == 'Module'
     
     # Case-insensitive search with contains
     results = s.search('test', contains=True, ignore_case=True)
@@ -232,16 +232,16 @@ def test_absolute_path_search(complex_kicad_pcb):
     # Find all footprints
     results = complex_kicad_pcb.search('/kicad_pcb/footprint')  # Absolute path
     assert len(results) == 2
-    assert results[0][1][0] == 'footprint'
-    assert 'Capacitor_SMD:C_0805_2012Metric' in results[0][1][1]
-    assert 'Resistor_SMD:R_0805_2012Metric' in results[1][1][1]
+    assert results[0][0] == 'footprint'
+    assert 'Capacitor_SMD:C_0805_2012Metric' in results[0][1]
+    assert 'Resistor_SMD:R_0805_2012Metric' in results[1][1]
 
     # Find all properties using absolute path
     results = complex_kicad_pcb.search('/kicad_pcb/footprint/property')
     assert len(results) == 2
-    assert all(match[0] == 'property' for _, match in results)
-    assert any('C1' in match for _, match in results)
-    assert any('R1' in match for _, match in results)
+    assert all(match[0] == 'property' for match in results)
+    assert any('C1' in match for match in results)
+    assert any('R1' in match for match in results)
 
 
 def test_relative_path_search(complex_kicad_pcb):
@@ -260,12 +260,12 @@ def test_multi_level_path(complex_kicad_pcb):
     # Find all model elements contained in footprints
     results = complex_kicad_pcb.search('footprint/model')
     assert len(results) == 2
-    assert all('3dshapes' in str(match[1]) for _, match in results)
+    assert all('3dshapes' in str(match[1]) for match in results)
     
     # Find all rotate elements within models
     results = complex_kicad_pcb.search('model/rotate')
     assert len(results) == 2
-    assert all(match == ['rotate', ['xyz', 0, 0, 0]] for _, match in results)
+    assert all(match == ['rotate', ['xyz', 0, 0, 0]] for match in results)
 
 
 def test_function_search(complex_kicad_pcb):
@@ -300,7 +300,7 @@ def test_regex_search(complex_kicad_pcb):
 def test_combined_searches(complex_kicad_pcb):
     """Test combining multiple search results."""
     # Find capacitor footprint
-    capacitor = complex_kicad_pcb.search('Capacitor_SMD:C_0805_2012Metric', contains=True)
+    capacitor = complex_kicad_pcb.search('Capacitor_SMD:C_0805_2012Metric', contains=True, include_path=True)
     assert len(capacitor) == 1
     capacitor_path = capacitor[0][0]
     
@@ -314,7 +314,7 @@ def test_combined_searches(complex_kicad_pcb):
     assert all(pad[0] == 'pad' for pad in capacitor_pads)
     
     # Alternative approach using search with path constraint
-    resistor = complex_kicad_pcb.search('Resistor_SMD:R_0805_2012Metric', contains=True)
+    resistor = complex_kicad_pcb.search('Resistor_SMD:R_0805_2012Metric', contains=True, include_path=True)
     assert len(resistor) == 1
     resistor_path = resistor[0][0]
     
@@ -335,7 +335,7 @@ def test_counting_and_verification(complex_kicad_pcb):
     assert len(layers) == 1
     
     # Verify the layer structure
-    layers_section = complex_kicad_pcb.search('layers')[0][1]
+    layers_section = complex_kicad_pcb.search('layers')[0]
     assert isinstance(layers_section, Sexp)
     assert len(layers_section) == 5  # 'layers' + 4 layer definitions
     
@@ -343,7 +343,7 @@ def test_counting_and_verification(complex_kicad_pcb):
     # Replaced 'value' search_type with direct path search
     nets = complex_kicad_pcb.search('net')
     assert len(nets) == 3
-    net_names = [match[2] for _, match in nets if len(match) > 2]
+    net_names = [match[2] for match in nets if len(match) > 2]
     assert set(net_names) == set(['', 'GND', 'VCC'])
 
 
@@ -351,7 +351,7 @@ def test_deep_nested_structure(complex_kicad_pcb):
     """Test searching in deeply nested structures."""
     # Find 3D model paths (deeply nested)
     model_paths = []
-    for _, match in complex_kicad_pcb.search('model'):
+    for match in complex_kicad_pcb.search('model'):
         if len(match) > 1:
             model_paths.append(match[1])
     
