@@ -118,11 +118,11 @@ def prettify_sexp(sexp, **prettify_kwargs):
         '(a (b\\n    (c (d))))'
         >>> prettify_sexp("(deeply (nested (expression)))", indent=4)
         '(deeply\\n    (nested\\n        (expression)))'
-        >>> prettify_sexp('(with "quoted \\"strings\\"" (intact))')
-        '(with "quoted \\"strings\\""\\n  (intact))'
+        >>> prettify_sexp('(with "quoted \"strings\"" (intact))')
+        '(with "quoted \"strings\""\\n  (intact))'
     """
     break_inc = prettify_kwargs.get('break_inc', 1)
-    indent = prettify_kwargs.get('indent', 2)  # Changed from spaces_per_level to indent
+    indent = prettify_kwargs.get('indent', 2)
 
     # Remove all newlines from the input
     sexp = sexp.replace('\n', '')
