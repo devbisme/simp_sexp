@@ -363,3 +363,148 @@ def test_deep_nested_structure(complex_kicad_pcb):
     # Find all rotation specifications (xyz 0 0 0)
     rotations = complex_kicad_pcb.search('xyz', contains=True)  # Now using contains=True
     assert len(rotations) == 6  # 3 for each model (offset, scale, rotate)
+
+
+# Tests for add_quotes method
+def test_add_quotes_simple():
+    """Test adding quotes to simple elements."""
+    s = Sexp('(module TEST (layer F.Cu) (tedit 5F5B7C83) (attr through_hole))')
+    
+    # Add quotes to layer elements
+    s.add_quotes('layer')
+    
+    # Check that 'F.Cu' now has quotes
+    layer_results = s.search('layer')
+    assert len(layer_results) == 1
+    assert layer_results[0][1] == '"F.Cu"'
+    
+    # Add quotes to attr elements
+    s.add_quotes('attr')
+    
+    # Check that 'through_hole' now has quotes
+    attr_results = s.search('attr')
+    assert len(attr_results) == 1
+    assert attr_results[0][1] == '"through_hole"'
+
+def test_add_quotes_with_function():
+    """Test adding quotes using a function pattern."""
+    s = Sexp('(module TEST (layer F.Cu) (pad 1 smd rect) (pad 2 smd rect))')
+    
+    # Add quotes to all pad elements with smd
+    s.add_quotes(lambda x: x[0] == 'pad' and 'smd' in x)
+    
+    # Check that pad elements now have quotes
+    pad_results = s.search('pad')
+    assert len(pad_results) == 2
+    
+    for pad in pad_results:
+        assert pad[1] == 1 or pad[1] == 2  # The numbers should remain unquoted
+        assert pad[2] == '"smd"'  # 'smd' should now be quoted
+        assert pad[3] == '"rect"'  # 'rect' should now be quoted
+
+def test_add_quotes_with_regex():
+    """Test adding quotes using a regex pattern."""
+    import re
+    s = Sexp('(footprint TEST (layer F.Cu) (type SMD) (property Reference "REF"))')
+    
+    # Add quotes to elements starting with 'lay'
+    s.add_quotes(re.compile(r'^lay'))
+    
+    # Check that 'F.Cu' now has quotes
+    layer_results = s.search('layer')
+    assert len(layer_results) == 1
+    assert layer_results[0][1] == '"F.Cu"'
+    
+    # Add quotes to elements containing 'type'
+    s.add_quotes(re.compile(r'type'))
+    
+    # Check that 'SMD' now has quotes
+    type_results = s.search('type')
+    assert len(type_results) == 1
+    assert type_results[0][1] == '"SMD"'
+
+def test_add_quotes_with_nested():
+    """Test adding quotes in nested expressions."""
+    s = Sexp('(module TEST (model path.wrl (offset (xyz x0 y0 z0)) (scale (xyz x1 y1 z1))))')
+    
+    # Add quotes to all xyz elements
+    s.add_quotes('xyz')
+    
+    # Check that xyz coordinates now have quotes
+    xyz_results = s.search('xyz')
+    assert len(xyz_results) == 2
+    
+    # Check first xyz (offset)
+    assert xyz_results[0][1] == '"x0"'
+    assert xyz_results[0][2] == '"y0"'
+    assert xyz_results[0][3] == '"z0"'
+    
+    # Check second xyz (scale)
+    assert xyz_results[1][1] == '"x1"'
+    assert xyz_results[1][2] == '"y1"'
+    assert xyz_results[1][3] == '"z1"'
+
+def test_add_quotes_with_path():
+    """Test adding quotes using a path pattern."""
+    s = Sexp('(kicad_pcb (version 20171130) (general (foo bar)) (setup (baz bop0 bop1)))')
+
+    # Add quotes to foo value using path
+    s.add_quotes('/kicad_pcb/general/foo')
+
+    # Check that thickness value now has quotes
+    foo = s.search("/kicad_pcb/general/foo")[0]
+    assert foo[1] == '"bar"'
+
+    # Add quotes to baz coordinates
+    s.add_quotes('setup/baz')
+
+    # Check that baz coordinates now have quotes
+    grid = s.search('baz')[0]
+    assert grid[1] == '"bop0"'
+    assert grid[2] == '"bop1"'
+
+def test_add_quotes_with_contains():
+    """Test adding quotes using contains parameter."""
+    s = Sexp('(module TEST (pad 1 smd rect) (property Reference "R1") (attr smd))')
+    
+    # Add quotes to elements containing 'smd' anywhere
+    s.add_quotes('smd', contains=True)
+    
+    # Check pad element
+    pad = s.search('pad')[0]
+    assert pad[2] == '"smd"'  # 'smd' should now be quoted
+    
+    # Check attr element
+    attr = s.search('attr')[0]
+    assert attr[1] == '"smd"'  # 'smd' should now be quoted
+
+def test_add_quotes_preserve_first_element():
+    """Test that add_quotes preserves the first element without quoting it."""
+    s = Sexp('(layer F.Cu) (pad 1 smd rect) (text note)')
+    
+    # Add quotes to all elements
+    s.add_quotes(lambda x: True)
+    
+    # Check that first elements are not quoted
+    assert s[0][0] == 'layer'  # First element should remain unquoted
+    assert s[1][0] == 'pad'    # First element should remain unquoted
+    assert s[2][0] == 'text'   # First element should remain unquoted
+    
+    # Check that other elements are quoted
+    assert s[0][1] == '"F.Cu"'
+    assert s[1][2] == '"smd"'
+    assert s[1][3] == '"rect"'
+    assert s[2][1] == '"note"'
+
+def test_add_quotes_with_complex_kicad_pcb(complex_kicad_pcb):
+    """Test adding quotes on a complex KiCad PCB structure."""
+    # Add quotes to all layer references in footprints
+    complex_kicad_pcb.add_quotes('/kicad_pcb/footprint/layer')
+    
+    # Check both footprints have quoted layer values
+    footprints = complex_kicad_pcb.search('/kicad_pcb/footprint')
+    assert len(footprints) == 2
+    
+    for fp in footprints:
+        layer = next(l for l in fp if isinstance(l, list) and l[0] == 'layer')
+        assert layer[1] == '"F.Cu"'  # Should now be quoted
