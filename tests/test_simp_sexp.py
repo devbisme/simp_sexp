@@ -38,7 +38,8 @@ def test_escaped_quotes():
 # Tests for to_str method
 def test_to_str():
     s = Sexp(['hello', 'world'])
-    assert s.to_str(break_inc=0) == '(hello "world")'
+    assert s.to_str(break_inc=0) == '(hello world)'
+    assert s.to_str(quote_strs=True, break_inc=0) == '(hello "world")'
     
     s = Sexp(['hello', ['world']])
     assert s.to_str(break_inc=0) == '(hello (world))'
@@ -48,16 +49,22 @@ def test_to_str_quoting():
     s = Sexp(['values', 42, 3.14])
     assert s.to_str(quote_nums=True, break_inc=0) == '(values "42" "3.14")'
     assert s.to_str(quote_nums=False, break_inc=0) == '(values 42 3.14)'
+    # Test with default (no quoting)
+    assert s.to_str(break_inc=0) == '(values 42 3.14)'
     
     # Test string quoting
     s = Sexp(['items', 'a', 'b'])
     assert s.to_str(quote_strs=True, break_inc=0) == '(items "a" "b")'
     assert s.to_str(quote_strs=False, break_inc=0) == '(items a b)'
+    # Test with default (no quoting)
+    assert s.to_str(break_inc=0) == '(items a b)'
 
     # Test embedded string quoting
     s = Sexp(['text', 'Quote: " and another: "'])
     assert s.to_str(quote_strs=True, break_inc=0) == '(text "Quote: \\" and another: \\"")'
     assert s.to_str(quote_strs=False, break_inc=0) == '(text Quote: " and another: ")'
+    # Test with default (no quoting)
+    assert s.to_str(break_inc=0) == '(text Quote: " and another: ")'
 
 def test_prettify():
     s = Sexp(['module', 'TEST', ['layer', 'F.Cu'], ['attr', 'smd'], ['pad', 1, 'smd', ['rect', 100, 100]]])
