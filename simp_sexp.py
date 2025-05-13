@@ -622,6 +622,34 @@ class Sexp(list):
 
         return results
 
+    def add_quotes(self, pattern, **kwargs):
+        """
+        Search for elements matching the given pattern and add quotes to all elements 
+        except the first one in each matching expression.
+        
+        This method accepts the same parameters as the search() method, except for 'include_path'.
+        It modifies the elements directly in the original Sexp object.
+        
+        Args:
+            pattern: The pattern to search for:
+                - str: A slash-delimited path (e.g., "key1/key2" or "/root/key1")
+                - function: A function that takes a sublist and returns True/False
+                - re.Pattern: A compiled regular expression to match against first element
+                - list/tuple: A sequence of indices representing an exact path
+            **kwargs: Keyword arguments to pass to the search() method,
+                     excluding 'include_path' which is handled internally
+        
+        Returns:
+            None: Modifications are applied in-place to the Sexp object
+        """
+
+        kwargs.pop("include_path", None)
+        for result in self.search(pattern, **kwargs):
+            # Skip the first element (the match identifier)
+            for i, elem in enumerate(result[1:], 1):
+                if isinstance(elem, str):
+                    result[i] = f'"{result[i]}"'
+
     def __str__(self):
         """
         Return the string representation of the Sexp object as an S-expression.
