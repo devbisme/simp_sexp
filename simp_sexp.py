@@ -370,13 +370,13 @@ class Sexp(list):
                 if isinstance(self[i], list) and not isinstance(self[i], Sexp):
                     self[i] = Sexp(self[i])
 
-    def to_str(self, quote_nums=True, quote_strs=True, **prettify_kwargs):
+    def to_str(self, quote_nums=False, quote_strs=False, **prettify_kwargs):
         """
         Convert the Sexp object to an S-expression string.
         
         Args:
-            quote_nums (bool): If True, wrap numeric values in double-quotes. Default is True.
-            quote_strs (bool): If True, wrap string values in double-quotes. Default is True.
+            quote_nums (bool): If True, wrap numeric values in double-quotes. Default is False.
+            quote_strs (bool): If True, wrap string values in double-quotes. Default is False.
             **prettify_kwargs: Keyword arguments for formatting:
                 - break_inc (int): Controls when linebreaks are inserted based on nesting level.
                   Default is 1 (break at every level). Set to 0 or negative for no linebreaks.
