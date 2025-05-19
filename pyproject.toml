@@ -7,7 +7,7 @@ name = "simp_sexp"
 dynamic = ["version"]
 description = "A simple S-expression parser"
 authors = [
-    {name = "Developer", email = "developer@example.com"}
+    {name = "Dave Vandenbout", email = "dave@vdb.name"}
 ]
 readme = "README.md"
 requires-python = ">=3.8"
@@ -36,7 +36,10 @@ classifiers = [
 keywords = ["s-expression", "sexp", "lisp", "KiCad", "serialization"]
 
 [project.urls]
-"Homepage" = "https://github.com/user/simp_sexp"
+"Homepage" = "https://github.com/devbisme/simp_sexp"
+"Documentation" = "https://github.com/devbisme/simp_sexp#readme"
+"Bug Tracker" = "https://github.com/devbisme/simp_sexp/issues"
+"Source Code" = "https://github.com/devbisme/simp_sexp"
 
 [project.optional-dependencies]
 dev = [
