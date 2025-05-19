@@ -237,8 +237,8 @@ class Sexp(list):
         >>> expr
         ['define', ['square', 'x'], ['*', 'x', 'x']]
         >>> print(expr.to_str(break_inc=0))
-        (define (square "x") (* "x" "x"))
-        >>> subexpr = expr.search('square')
+        (define (square x) (* x x))
+        >>> subexpr = expr.search('square', include_path=True)
         >>> subexpr
         [([1], ['square', 'x'])]
     """
@@ -622,7 +622,7 @@ class Sexp(list):
 
         return results
 
-    def add_quotes(self, pattern, **kwargs):
+    def add_quotes(self, pattern, stop_idx=None, **kwargs):
         """
         Search for elements matching the given pattern and add quotes to all elements 
         except the first one in each matching expression.
@@ -636,17 +636,29 @@ class Sexp(list):
                 - function: A function that takes a sublist and returns True/False
                 - re.Pattern: A compiled regular expression to match against first element
                 - list/tuple: A sequence of indices representing an exact path
+            stop_idx (int, optional): If provided, only add quotes to elements up to this index 
+                                     (exclusive). If None, process all elements. Default is None.
             **kwargs: Keyword arguments to pass to the search() method,
                      excluding 'include_path' which is handled internally
         
         Returns:
             None: Modifications are applied in-place to the Sexp object
+            
+        Examples:
+            >>> s = Sexp('((layer F.Cu) (pad 1 smd rect))')
+            >>> s.add_quotes('layer')  # Add quotes to elements in layer expressions
+            >>> print(s.to_str(break_inc=0))
+            ((layer "F.Cu") (pad 1 smd rect))
+            
+            >>> s.add_quotes(lambda x: x[0] == 'pad', stop_idx=3)  # Add quotes using a function
+            >>> print(s.to_str(break_inc=0))
+            ((layer "F.Cu") (pad 1 "smd" rect))
         """
 
         kwargs.pop("include_path", None)
         for result in self.search(pattern, **kwargs):
-            # Skip the first element (the match identifier)
-            for i, elem in enumerate(result[1:], 1):
+            # Skip the first element (the match identifier) and process up to the stop index (exclusive)
+            for i, elem in enumerate(result[1:stop_idx], 1):
                 if isinstance(elem, str):
                     result[i] = f'"{result[i]}"'
 
