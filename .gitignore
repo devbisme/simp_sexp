@@ -34,3 +34,4 @@ ENV/
 
 # Documentation
 docs/_build/
+version.py
