@@ -1,10 +1,11 @@
 [build-system]
-requires = ["setuptools>=42", "wheel", "setuptools_scm[toml]>=6.0"]
+requires = ["setuptools>=61.0.0", "wheel", "setuptools_scm[toml]>=6.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "simp_sexp"
-dynamic = ["version"]
+version = "0.1.0"
+#dynamic = ["version"]
 description = "A simple S-expression parser"
 authors = [
     {name = "Dave Vandenbout", email = "dave@vdb.name"}
