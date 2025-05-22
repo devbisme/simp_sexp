@@ -515,3 +515,190 @@ def test_add_quotes_with_complex_kicad_pcb(complex_kicad_pcb):
     for fp in footprints:
         layer = next(l for l in fp if isinstance(l, list) and l[0] == 'layer')
         assert layer[1] == '"F.Cu"'  # Should now be quoted
+
+
+# Tests for rmv_quotes method
+def test_rmv_quotes_simple():
+    """Test removing quotes from simple elements."""
+    s = Sexp('(module TEST (layer "F.Cu") (tedit "5F5B7C83") (attr "through_hole"))')
+    
+    # Remove quotes from layer elements
+    s.rmv_quotes('layer')
+    
+    # Check that 'F.Cu' now has no quotes
+    layer_results = s.search('layer')
+    assert len(layer_results) == 1
+    assert layer_results[0][1] == 'F.Cu'
+    
+    # Remove quotes from attr elements
+    s.rmv_quotes('attr')
+    
+    # Check that 'through_hole' now has no quotes
+    attr_results = s.search('attr')
+    assert len(attr_results) == 1
+    assert attr_results[0][1] == 'through_hole'
+
+def test_rmv_quotes_with_function():
+    """Test removing quotes using a function pattern."""
+    s = Sexp('(module TEST (layer "F.Cu") (pad 1 "smd" "rect") (pad 2 "smd" "rect"))')
+    
+    # Remove quotes from all pad elements with smd
+    s.rmv_quotes(lambda x: x[0] == 'pad' and '"smd"' in x)
+    
+    # Check that pad elements now have no quotes
+    pad_results = s.search('pad')
+    assert len(pad_results) == 2
+    
+    for pad in pad_results:
+        assert pad[1] == 1 or pad[1] == 2  # The numbers should remain unquoted
+        assert pad[2] == 'smd'  # 'smd' should now be unquoted
+        assert pad[3] == 'rect'  # 'rect' should now be unquoted
+
+def test_rmv_quotes_with_regex():
+    """Test removing quotes using a regex pattern."""
+    import re
+    s = Sexp('(footprint TEST (layer "F.Cu") (type "SMD") (property Reference "REF"))')
+    
+    # Remove quotes from elements starting with 'lay'
+    s.rmv_quotes(re.compile(r'^lay'))
+    
+    # Check that 'F.Cu' now has no quotes
+    layer_results = s.search('layer')
+    assert len(layer_results) == 1
+    assert layer_results[0][1] == 'F.Cu'
+    
+    # Remove quotes from elements containing 'type'
+    s.rmv_quotes(re.compile(r'type'))
+    
+    # Check that 'SMD' now has no quotes
+    type_results = s.search('type')
+    assert len(type_results) == 1
+    assert type_results[0][1] == 'SMD'
+
+def test_rmv_quotes_with_nested():
+    """Test removing quotes in nested expressions."""
+    s = Sexp('(module TEST (model path.wrl (offset (xyz "x0" "y0" "z0")) (scale (xyz "x1" "y1" "z1"))))')
+    
+    # Remove quotes from all xyz elements
+    s.rmv_quotes('xyz')
+    
+    # Check that xyz coordinates now have no quotes
+    xyz_results = s.search('xyz')
+    assert len(xyz_results) == 2
+    
+    # Check first xyz (offset)
+    assert xyz_results[0][1] == 'x0'
+    assert xyz_results[0][2] == 'y0'
+    assert xyz_results[0][3] == 'z0'
+    
+    # Check second xyz (scale)
+    assert xyz_results[1][1] == 'x1'
+    assert xyz_results[1][2] == 'y1'
+    assert xyz_results[1][3] == 'z1'
+
+def test_rmv_quotes_with_path():
+    """Test removing quotes using a path pattern."""
+    s = Sexp('(kicad_pcb (version "20171130") (general (foo "bar")) (setup (baz "bop0" "bop1")))')
+
+    # Remove quotes from foo value using path
+    s.rmv_quotes('/kicad_pcb/general/foo')
+
+    # Check that thickness value now has no quotes
+    foo = s.search("/kicad_pcb/general/foo")[0]
+    assert foo[1] == 'bar'
+
+    # Remove quotes from baz coordinates
+    s.rmv_quotes('setup/baz')
+
+    # Check that baz coordinates now have no quotes
+    grid = s.search('baz')[0]
+    assert grid[1] == 'bop0'
+    assert grid[2] == 'bop1'
+
+def test_rmv_quotes_with_contains():
+    """Test removing quotes using contains parameter."""
+    s = Sexp('(module TEST (pad 1 "smd" "rect") (property Reference "R1") (attr "smd"))')
+    
+    # Remove quotes from elements containing 'smd' anywhere
+    s.rmv_quotes('smd', contains=True)
+    
+    # Check pad element
+    pad = s.search('pad')[0]
+    assert pad[2] == 'smd'  # 'smd' should now be unquoted
+    
+    # Check attr element
+    attr = s.search('attr')[0]
+    assert attr[1] == 'smd'  # 'smd' should now be unquoted
+
+def test_rmv_quotes_preserve_first_element():
+    """Test that rmv_quotes preserves the first element."""
+    s = Sexp('("layer" "F.Cu") ("pad" 1 "smd" "rect") ("text" "note")')
+    
+    # Remove quotes from all elements
+    s.rmv_quotes(lambda x: True)
+    
+    # Check that first elements have quotes removed
+    assert s[0][0] == 'layer'  # First element should be unquoted
+    assert s[1][0] == 'pad'    # First element should be unquoted
+    assert s[2][0] == 'text'   # First element should be unquoted
+    
+    # Check that other elements have quotes removed
+    assert s[0][1] == 'F.Cu'
+    assert s[1][2] == 'smd'
+    assert s[1][3] == 'rect'
+    assert s[2][1] == 'note'
+
+def test_rmv_quotes_with_stop_idx():
+    """Test removing quotes with stop_idx parameter."""
+    s = Sexp('(module TEST (layer "F.Cu") (pad 1 "smd" "rect") (pad 2 "smd" "rect"))')
+    breakpoint()
+    # Remove quotes from 'pad' elements but only up to the third element
+    s.rmv_quotes(lambda x: x[0] == 'pad', stop_idx=3)
+    
+    # Check that pad elements have quotes removed correctly
+    pads = s.search('pad')
+    for pad in pads:
+        assert pad[1] == 1 or pad[1] == 2  # Numbers should remain unquoted
+        assert pad[2] == 'smd'             # Should have quotes removed
+        assert pad[3] == '"rect"'          # Should still have quotes (beyond stop_idx)
+
+def test_rmv_quotes_with_complex_kicad_pcb(complex_kicad_pcb):
+    """Test removing quotes on a complex KiCad PCB structure."""
+    # First add quotes to all layer references in footprints
+    complex_kicad_pcb.add_quotes('/kicad_pcb/footprint/layer')
+    
+    # Check that quotes were added
+    footprints = complex_kicad_pcb.search('/kicad_pcb/footprint')
+    for fp in footprints:
+        layer = next(l for l in fp if isinstance(l, list) and l[0] == 'layer')
+        assert layer[1] == '"F.Cu"'  # Should be quoted
+    
+    # Now remove the quotes
+    complex_kicad_pcb.rmv_quotes('/kicad_pcb/footprint/layer')
+    
+    # Check that quotes were removed
+    footprints = complex_kicad_pcb.search('/kicad_pcb/footprint')
+    for fp in footprints:
+        layer = next(l for l in fp if isinstance(l, list) and l[0] == 'layer')
+        assert layer[1] == 'F.Cu'  # Should now be unquoted
+
+def test_add_and_rmv_quotes_roundtrip():
+    """Test that add_quotes followed by rmv_quotes preserves the original structure."""
+    original = Sexp('(module TEST (layer F.Cu) (pad 1 smd rect) (pad 2 smd rect))')
+    original_str = original.to_str(break_inc=0)
+    
+    # Add quotes
+    original.add_quotes(lambda x: True)
+    
+    # Make sure quotes were added
+    for item in original:
+        if isinstance(item, list):
+            for i, elem in enumerate(item):
+                if i > 0 and isinstance(elem, str):
+                    assert elem.startswith('"') and elem.endswith('"')
+    
+    # Remove quotes
+    original.rmv_quotes(lambda x: True)
+    
+    # Make sure it's back to the original
+    assert original.to_str(break_inc=0) == original_str

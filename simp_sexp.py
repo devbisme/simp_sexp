@@ -662,6 +662,50 @@ class Sexp(list):
                 if isinstance(elem, str):
                     result[i] = f'"{result[i]}"'
 
+    def rmv_quotes(self, pattern, stop_idx=None, **kwargs):
+        """
+        Search for elements matching the given pattern and remove quotes from all elements 
+        except the first one in each matching expression.
+        
+        This method is the reverse of add_quotes() and accepts the same parameters as the search() method,
+        except for 'include_path'. It modifies the elements directly in the original Sexp object.
+        
+        Args:
+            pattern: The pattern to search for:
+                - str: A slash-delimited path (e.g., "key1/key2" or "/root/key1")
+                - function: A function that takes a sublist and returns True/False
+                - re.Pattern: A compiled regular expression to match against first element
+                - list/tuple: A sequence of indices representing an exact path
+            stop_idx (int, optional): If provided, only remove quotes from elements up to this index 
+                                     (exclusive). If None, process all elements. Default is None.
+            **kwargs: Keyword arguments to pass to the search() method,
+                     excluding 'include_path' which is handled internally
+        
+        Returns:
+            None: Modifications are applied in-place to the Sexp object
+            
+        Examples:
+            >>> s = Sexp('((layer "F.Cu") (pad 1 "smd" "rect"))')
+            >>> s.rmv_quotes('layer')  # Remove quotes from elements in layer expressions
+            >>> print(s.to_str(break_inc=0))
+            ((layer F.Cu) (pad 1 "smd" "rect"))
+            
+            >>> s.rmv_quotes(lambda x: x[0] == 'pad')  # Remove quotes using a function
+            >>> print(s.to_str(break_inc=0))
+            ((layer F.Cu) (pad 1 smd rect))
+        """
+        
+        kwargs.pop("include_path", None)
+        for result in self.search(pattern, **kwargs):
+            # Skip the first element (the match identifier) and process up to the stop index (exclusive)
+            for i, elem in enumerate(result[1:stop_idx], 1):
+                breakpoint()
+                if isinstance(elem, str):
+                    # Check if the string is wrapped in quotes
+                    if (elem.startswith('"') and elem.endswith('"')) or (elem.startswith("'") and elem.endswith("'")):
+                        # Remove the quotes
+                        result[i] = elem[1:-1]
+
     def __str__(self):
         """
         Return the string representation of the Sexp object as an S-expression.
