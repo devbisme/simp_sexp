@@ -686,6 +686,8 @@ class Sexp(list):
             
         Examples:
             >>> s = Sexp('((layer "F.Cu") (pad 1 "smd" "rect"))')
+            >>> s.add_quotes('layer')  # Add quotes to elements in layer expressions
+            >>> s.add_quotes('pad')  # Add quotes to elements in pad expressions
             >>> s.rmv_quotes('layer')  # Remove quotes from elements in layer expressions
             >>> print(s.to_str(break_inc=0))
             ((layer F.Cu) (pad 1 "smd" "rect"))
