@@ -699,7 +699,6 @@ class Sexp(list):
         for result in self.search(pattern, **kwargs):
             # Skip the first element (the match identifier) and process up to the stop index (exclusive)
             for i, elem in enumerate(result[1:stop_idx], 1):
-                breakpoint()
                 if isinstance(elem, str):
                     # Check if the string is wrapped in quotes
                     if (elem.startswith('"') and elem.endswith('"')) or (elem.startswith("'") and elem.endswith("'")):

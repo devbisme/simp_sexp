@@ -651,7 +651,10 @@ def test_rmv_quotes_preserve_first_element():
 def test_rmv_quotes_with_stop_idx():
     """Test removing quotes with stop_idx parameter."""
     s = Sexp('(module TEST (layer "F.Cu") (pad 1 "smd" "rect") (pad 2 "smd" "rect"))')
-    breakpoint()
+
+    # Add quotes around 'pad' elements
+    s.add_quotes("pad")
+
     # Remove quotes from 'pad' elements but only up to the third element
     s.rmv_quotes(lambda x: x[0] == 'pad', stop_idx=3)
     
