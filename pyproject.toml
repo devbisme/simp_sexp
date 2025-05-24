@@ -1,11 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0.0", "wheel", "setuptools_scm[toml]>=6.0"]
+requires = ["setuptools>=61.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "simp_sexp"
-version = "0.1.0"
-#dynamic = ["version"]
+version = "0.2.0"
 description = "A simple S-expression parser"
 authors = [
     {name = "Dave Vandenbout", email = "dave@vdb.name"}
@@ -57,11 +56,6 @@ universal = true
 [tool.pytest]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-
-[tool.setuptools_scm]
-version_file = "version.py"
-write_to = "version.py"
-write_to_template = '__version__ = "{version}"'
 
 [tool.tox]
 legacy_tox_ini = """

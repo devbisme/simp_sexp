@@ -1,7 +1,7 @@
 # History
 
 ## 0.2.0
-- Added Sexp method for removing quotes from elements within S-expressions
+- Added Sexp method rmv_quotes for removing quotes from elements within S-expressions
 
 ## 0.1.0 (Initial Release)
 - Initial release of simp_sexp
