@@ -1,5 +1,8 @@
 # History
 
+## 0.2.1
+- Updated compatible Python versions to include 3.7.
+
 ## 0.2.0
 - Added Sexp method rmv_quotes for removing quotes from elements within S-expressions
 
