@@ -1,5 +1,8 @@
 # History
 
+## 0.2.2
+- Updated compatible Python versions to include 3.6.
+
 ## 0.2.1
 - Updated compatible Python versions to include 3.7.
 
