@@ -463,7 +463,7 @@ class Sexp(list):
         """
         import re
 
-        results = []
+        results = Sexp([])
         current_path = []
         current_keypath = []
 
@@ -746,6 +746,23 @@ class Sexp(list):
         """
         for item in iterable:
             self.append(item)
+
+    @property
+    def value(self):
+        """_summary_
+        Extract a single value from an Sexp that is a single-item list which has a beginning label followed by a value.
+
+        Raises:
+            ValueError: If the Sexp is not in the proper form of [[label, value]].
+
+        Returns:
+            Whatever the second element of the first item is, which is expected to be a single value.
+        """
+        if len(self) != 1:
+            raise ValueError("Sexp isn't in a form that permits extracting a single value.")
+        if len(self[0]) != 2:
+            raise ValueError("Sexp isn't in a form that permits extracting a single value.")
+        return self[0][1]
 
     def __setitem__(self, key, value):
         """
