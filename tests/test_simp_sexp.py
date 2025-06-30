@@ -705,3 +705,85 @@ def test_add_and_rmv_quotes_roundtrip():
     
     # Make sure it's back to the original
     assert original.to_str(break_inc=0) == original_str
+
+
+# Tests for value property
+def test_value_property_string():
+    """Test value property with string values."""
+    s = Sexp('((layer F.Cu))')
+    assert s.value == 'F.Cu'
+    
+    s = Sexp('((name "Test Component"))')
+    assert s.value == 'Test Component'
+
+def test_value_property_numeric():
+    """Test value property with numeric values."""
+    s = Sexp('((thickness 1.6))')
+    assert s.value == 1.6
+    
+    s = Sexp('((count 42))')
+    assert s.value == 42
+
+def test_value_property_hex():
+    """Test value property with hexadecimal values."""
+    s = Sexp('((tedit 0x5F5B7C83))')
+    assert s.value == 0x5F5B7C83
+
+def test_value_property_quoted_string():
+    """Test value property with quoted string values."""
+    s = Sexp('((description "A test description"))')
+    assert s.value == 'A test description'
+
+def test_value_property_invalid_structure():
+    """Test that value property raises ValueError for invalid structures."""
+    # Empty Sexp
+    s = Sexp('()')
+    with pytest.raises(ValueError, match="Sexp isn't in a form that permits extracting a single value."):
+        _ = s.value
+    
+    # Multiple top-level items
+    s = Sexp('((layer F.Cu) (thickness 1.6))')
+    with pytest.raises(ValueError, match="Sexp isn't in a form that permits extracting a single value."):
+        _ = s.value
+    
+    # Single item with wrong number of elements
+    s = Sexp('((layer))')
+    with pytest.raises(ValueError, match="Sexp isn't in a form that permits extracting a single value."):
+        _ = s.value
+    
+    # Single item with too many elements
+    s = Sexp('((layer F.Cu extra))')
+    with pytest.raises(ValueError, match="Sexp isn't in a form that permits extracting a single value."):
+        _ = s.value
+    
+    # Top-level item is not a list
+    s = Sexp('(layer)')
+    with pytest.raises(ValueError, match="Sexp isn't in a form that permits extracting a single value."):
+        _ = s.value
+
+def test_value_property_nested_structure():
+    """Test value property with nested structures as values."""
+    s = Sexp('((position (xyz 1.0 2.0 0.0)))')
+    position_value = s.value
+    assert isinstance(position_value, Sexp)
+    assert position_value == ['xyz', 1.0, 2.0, 0.0]
+
+def test_value_property_real_world_examples():
+    """Test value property with real-world KiCad examples."""
+    # Version example
+    s = Sexp('((version 20171130))')
+    assert s.value == 20171130
+    
+    # Reference example
+    s = Sexp('((Reference "C1"))')
+    assert s.value == 'C1'
+
+def test_value_property_with_search():
+    """Test using value property with search results."""
+    pcb = Sexp('(kicad_pcb (version 20171130) (general (thickness 1.6)))')
+    
+    # Find version and extract its value
+    assert pcb.search('/kicad_pcb/version').value == 20171130
+    
+    # Find thickness and extract its value
+    assert pcb.search('/kicad_pcb/general/thickness').value == 1.6
