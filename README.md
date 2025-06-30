@@ -12,6 +12,7 @@ A simple S-expression parser for Python.
 - Advanced search capabilities for finding elements within complex S-expressions
 - Support for quoted strings with proper escape handling
 - Automatic type conversion for numbers
+- Convenient `value` property for extracting single values from labeled expressions
 
 ## Installation
 
@@ -80,6 +81,55 @@ print(list_expr.to_str(break_inc=0))
 # Control quoting behavior
 print(list_expr.to_str(quote_strs=False, break_inc=0))
 # Output: (define (square x) (* x x))
+```
+
+### Extracting Values with the `value` Property
+
+The `value` property provides a convenient way to extract single values from S-expressions 
+that contain a single labeled element (a two-element list with a label and value).
+
+```python
+from simp_sexp import Sexp
+
+# Extract simple values
+version = Sexp("((version 20171130))")
+print(version.value)  # 20171130
+
+description = Sexp('((description "A test component"))')
+print(description.value)  # A test component
+
+# Combining with search results
+config = Sexp("""
+(kicad_pcb
+  (version 20171130)
+  (general
+    (thickness 1.6)
+    (drawings 5))
+  (layers
+    (0 F.Cu signal)))
+""")
+
+# Find and extract version
+print(f"PCB version: {config.search('/kicad_pcb/version').value}")  # PCB version: 20171130
+
+# Find and extract thickness
+print(f"Board thickness: {config.search('/kicad_pcb/general/thickness').value}mm")  # Board thickness: 1.6mm
+
+# Extract values from multiple search results
+print(f"Number of drawings: {config.search('/kicad_pcb/general/drawings').value}")  # Number of drawings: 5
+
+# Error handling - value property requires specific structure
+try:
+    invalid = Sexp("(multiple elements here)")
+    print(invalid.value)  # This will raise ValueError
+except ValueError as e:
+    print(f"Error: {e}")  # Error: Sexp isn't in a form that permits extracting a single value.
+
+try:
+    empty = Sexp("()")
+    print(empty.value)  # This will also raise ValueError
+except ValueError as e:
+    print(f"Error: {e}")  # Error: Sexp isn't in a form that permits extracting a single value.
 ```
 
 ### Handling Nested Expressions
