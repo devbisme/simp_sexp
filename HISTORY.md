@@ -1,5 +1,8 @@
 # History
 
+## 0.3.0
+- Added Sexp method value for extracting the value from an S-expression with a single item of form (key, value). 
+
 ## 0.2.2
 - Updated compatible Python versions to include 3.6.
 
