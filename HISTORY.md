@@ -1,5 +1,8 @@
 # History
 
+## 0.3.1
+- Quotes within a quoted string are now escaped.
+
 ## 0.3.0
 - Added Sexp method value for extracting the value from an S-expression with a single item of form (key, value). 
 

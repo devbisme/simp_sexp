@@ -660,7 +660,7 @@ class Sexp(list):
             # Skip the first element (the match identifier) and process up to the stop index (exclusive)
             for i, elem in enumerate(result[1:stop_idx], 1):
                 if isinstance(elem, str):
-                    result[i] = f'"{result[i]}"'
+                    result[i] = '"' + result[i].replace('"', '\\"') + '"'
 
     def rmv_quotes(self, pattern, stop_idx=None, **kwargs):
         """
@@ -704,8 +704,9 @@ class Sexp(list):
                 if isinstance(elem, str):
                     # Check if the string is wrapped in quotes
                     if (elem.startswith('"') and elem.endswith('"')) or (elem.startswith("'") and elem.endswith("'")):
-                        # Remove the quotes
-                        result[i] = elem[1:-1]
+                        # Remove the quotes and unescape any escaped quotes
+                        unquoted = elem[1:-1].replace('\\"', '"').replace("\\'", "'")
+                        result[i] = unquoted
 
     def __str__(self):
         """
