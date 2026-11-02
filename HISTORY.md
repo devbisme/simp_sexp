@@ -1,5 +1,9 @@
 # History
 
+## 0.3.2
+- `to_str()` now formats the complete S-expression once instead of reformatting every nested level, making it about five times faster.
+- Fixed stray spaces in `to_str()` output when `break_inc` is 2 or more. Output with the default settings is unchanged.
+
 ## 0.3.1
 - Quotes within a quoted string are now escaped.
 

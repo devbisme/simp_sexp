@@ -385,6 +385,21 @@ class Sexp(list):
         Returns:
             str: The formatted S-expression string.
         """
+        # Format once, on the complete expression. Formatting each nested level
+        # as well repeats the work for every level of nesting.
+        return prettify_sexp(self._to_flat_str(quote_nums, quote_strs), **prettify_kwargs)
+
+    def _to_flat_str(self, quote_nums, quote_strs):
+        """
+        Convert the Sexp object to an unformatted S-expression string.
+        
+        Args:
+            quote_nums (bool): If True, wrap numeric values in double-quotes.
+            quote_strs (bool): If True, wrap string values in double-quotes.
+        
+        Returns:
+            str: The S-expression string with no indentation or linebreaks added.
+        """
         if not isinstance(self, list):
             # If it's not a list, return it as a string
             return str(self)
@@ -397,12 +412,8 @@ class Sexp(list):
         elements = []
         for i, item in enumerate(self):
             if isinstance(item, list):
-                # Recursively convert nested lists using their to_str method if available
-                if hasattr(item, 'to_str'):
-                    elements.append(item.to_str(quote_nums, quote_strs, **prettify_kwargs))
-                else:
-                    # Fallback for regular lists
-                    elements.append(Sexp(item).to_str(quote_nums, quote_strs, **prettify_kwargs))
+                # Recursively convert nested lists, whether Sexp objects or regular lists
+                elements.append(Sexp._to_flat_str(item, quote_nums, quote_strs))
             else:
                 # For non-list items
                 item_str = str(item)
@@ -429,8 +440,8 @@ class Sexp(list):
                     else:
                         elements.append(item_str)
 
-        # Join all elements with spaces, wrap with parentheses, and make it pretty.
-        return prettify_sexp("(" + " ".join(elements) + ")", **prettify_kwargs)
+        # Join all elements with spaces and wrap with parentheses.
+        return "(" + " ".join(elements) + ")"
 
     def search(self, pattern, max_depth=None, contains=False, include_path=False, ignore_case=False):
         """

@@ -1,5 +1,6 @@
 import pytest
 import re
+import simp_sexp
 from simp_sexp import Sexp, prettify_sexp
 
 
@@ -43,6 +44,23 @@ def test_to_str():
     
     s = Sexp(['hello', ['world']])
     assert s.to_str(break_inc=0) == '(hello (world))'
+
+def test_to_str_formats_only_once(monkeypatch):
+    calls = []
+    original = simp_sexp.prettify_sexp
+    monkeypatch.setattr(
+        simp_sexp, "prettify_sexp", lambda *a, **kw: calls.append(a) or original(*a, **kw)
+    )
+    Sexp("(a (b (c (d))) (e))").to_str()
+    assert len(calls) == 1
+
+def test_to_str_matches_prettify_sexp_at_every_break_inc():
+    text = "(a (b (c (d e))) (f))"
+    for break_inc in (0, 1, 2, 3):
+        assert Sexp(text).to_str(break_inc=break_inc) == prettify_sexp(text, break_inc=break_inc)
+
+def test_to_str_handles_regular_nested_lists_and_empty_lists():
+    assert Sexp(["a", ["b", []]]).to_str(break_inc=0) == "(a (b ()))"
 
 def test_to_str_quoting():
     # Test numeric quoting
